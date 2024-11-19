@@ -115,13 +115,16 @@ levelSenseTrigger = 5000
 sensorBus = machine.I2C(0,scl=machine.Pin(9),sda=machine.Pin(8),freq=100000) #9,8
 
 #display:
-oledDisplay = ssd1306.SSD1306_I2C(128,32,sensorBus)
-oledDisplay.fill(0)
-oledDisplay.show()
-time.sleep(1)
-oledDisplay.text("Booting up...",0,0,1)
-oledDisplay.show()
-
+try:
+    oledDisplay = ssd1306.SSD1306_I2C(128,32,sensorBus)
+    oledDisplay.fill(0)
+    oledDisplay.show()
+    time.sleep(1)
+    oledDisplay.text("Booting up...",0,0,1)
+    oledDisplay.show()
+except:
+    print("no oled")
+    
 feedbackMessage = {
         "ID":"ACSWITCH1",
         "ENABLED": True,
@@ -194,10 +197,10 @@ def doInjection(device,ammount):
                     timeOn += 0.1
                 tempPin.duty(0)
                 feedbackMessage["ON"] = False
-                    try:
-                        client.publish(feedbackTopic,json.dumps(feedbackMessage.encode()))
-                    except:
-                        displayStatus("error","unable to send feedback message")
+                try:
+                    client.publish(feedbackTopic,json.dumps(feedbackMessage.encode()))
+                except:
+                    displayStatus("error","unable to send feedback message")
                 print("dispensed " + str(ammount) + "mL of " + config["DEVICES"][devNum]["CHEMICAL"])
                 displayStatus("status","dispensed " + str(ammount) + "mL of " + config["DEVICES"][devNum]["CHEMICAL"])
             else:
@@ -246,50 +249,53 @@ def doCirculation(device,runTime):
             pass
 
 def displayStatus(messageType,message,*addText):
-    oledDisplay.fill(0)
-    oledDisplay.show()
-    time.sleep(1)
-    if messageType == "status":
-        #oledDisplay.fill(0)
-        #oledDisplay.show()
-        oledDisplay.text(messageType,0,0,1)
-        oledDisplay.text(message,0,10,1)
-        #oledDisplay.show()
-    elif messageType == "error":
-        oledDisplay.text(messageType,0,0,1)
-        oledDisplay.text(message,0,10,1)
-    elif messageType == "telem":
-        oledDisplay.text(messageType,0,0,1)
-        oledDisplay.text(message,0,10,1)
-    else:
-        oledDisplay.text(messageType,0,0,1)
-        oledDisplay.text(message,0,10,1)
-    
-    oledDisplay.show()
-    
-    if addText:
-        try:
-            print(str(addText))
-        #pass
+    try:
+        oledDisplay.fill(0)
+        oledDisplay.show()
+        time.sleep(1)
+        if messageType == "status":
+            #oledDisplay.fill(0)
+            #oledDisplay.show()
+            oledDisplay.text(messageType,0,0,1)
+            oledDisplay.text(message,0,10,1)
+            #oledDisplay.show()
+        elif messageType == "error":
+            oledDisplay.text(messageType,0,0,1)
+            oledDisplay.text(message,0,10,1)
+        elif messageType == "telem":
+            oledDisplay.text(messageType,0,0,1)
+            oledDisplay.text(message,0,10,1)
+        else:
+            oledDisplay.text(messageType,0,0,1)
+            oledDisplay.text(message,0,10,1)
         
-            for lineNum,line in enumerate(addText):
-                oledDisplay.text(str(line),0,(lineNum+2)*10,1)
-                oledDisplay.show()
-                
-                if len(line) < int(128/8):
-                    #oledDisplay.show()
-                    pass
-                else:
-                    for i in range(len(line)%16):
-                        time.sleep(2)
-                        oledDisplay.scroll(16,0)
-                    #oledDisplay.scroll()
-        except Exception as error:
-            print("add text problem " + error) 
-    else:
-        pass
-    #oledDisplay.show()
-    #return
+        oledDisplay.show()
+        
+        if addText:
+            try:
+                print(str(addText))
+            #pass
+            
+                for lineNum,line in enumerate(addText):
+                    oledDisplay.text(str(line),0,(lineNum+2)*10,1)
+                    oledDisplay.show()
+                    
+                    if len(line) < int(128/8):
+                        #oledDisplay.show()
+                        pass
+                    else:
+                        for i in range(len(line)%16):
+                            time.sleep(2)
+                            oledDisplay.scroll(16,0)
+                        #oledDisplay.scroll()
+            except Exception as error:
+                print("add text problem " + error) 
+        else:
+            pass
+        #oledDisplay.show()
+        #return
+    except:
+        print("no oled")
 
 #encapsulate this in a function for easy reconnect
 displayStatus("status","WiFi Connecting")
