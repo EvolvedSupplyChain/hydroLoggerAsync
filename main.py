@@ -1,13 +1,24 @@
+#Version 0.2.1
+
 import json
 import machine
 import ssd1306
+#import os
+
+#fileString = __file__
+#version = "0.2.1"
+print("version 0.2.1")
 
 sensorBus = machine.I2C(0,scl=machine.Pin(9),sda=machine.Pin(8),freq=100000)
-oledDisplay = ssd1306.SSD1306_I2C(128,32,sensorBus)
 
-oledDisplay.fill(0)
-oledDisplay.show()
+try:
+    oledDisplay = ssd1306.SSD1306_I2C(128,32,sensorBus)
 
+    oledDisplay.fill(0)
+    oledDisplay.show()
+except:
+    print("no oled")
+    
 with open("config.json", 'r') as f:
     config = json.load(f)
 
