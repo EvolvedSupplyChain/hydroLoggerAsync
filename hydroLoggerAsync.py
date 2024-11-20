@@ -195,6 +195,7 @@ def doInjection(device,ammount):
                     time.sleep_ms(100)
                     #await asyncio.sleep_ms(100)
                     timeOn += 0.1
+                
                 tempPin.duty(0)
                 feedbackMessage["ON"] = False
                 try:
@@ -838,9 +839,9 @@ async def main():
                             "RTCLOCK": rtClock.datetime(),
                             "MEMFREE": gc.mem_free(),
                             "MEMUSED": gc.mem_alloc(),
-                            "LOWWATER": True if lowWater < levelSenseTrigger else False,
+                            "LOWWATER": lowWater
                             "LOWWATERRAW": lowWater,
-                            "HIGHWATER": True if highWater > levelSenseTrigger else False,
+                            "HIGHWATER": highWater,
                             "HIGHWATERRAW": highWater,
                             "FAN": fanEnabled
                            }
