@@ -568,7 +568,7 @@ if station.isconnected():
     except Exception as error:
         print(error)
         displayStatus("error","NTP fail",error)
-        rtClock.datetime(2000,1,1,1,1,1,1,0)
+        rtClock.datetime((2000,1,1,1,1,1,1,0))
     else:
         print("clock set")
         displayStatus("status","NTP Good!")
@@ -839,7 +839,7 @@ async def main():
                             "RTCLOCK": rtClock.datetime(),
                             "MEMFREE": gc.mem_free(),
                             "MEMUSED": gc.mem_alloc(),
-                            "LOWWATER": lowWater
+                            "LOWWATER": lowWater,
                             "LOWWATERRAW": lowWater,
                             "HIGHWATER": highWater,
                             "HIGHWATERRAW": highWater,
