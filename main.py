@@ -7,7 +7,7 @@ import ssd1306
 
 #fileString = __file__
 #version = "0.2.1"
-print("version 0.2.1")
+print("version 0.5.1")
 
 sensorBus = machine.I2C(0,scl=machine.Pin(9),sda=machine.Pin(8),freq=100000)
 
