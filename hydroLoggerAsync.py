@@ -959,7 +959,7 @@ async def main():
         else:
             fanControlPin.value(0)
             
-        if lowWaterSensorPin.read_uv() > levelSenseTrigger and highWaterSensorPin.read_uv() < levelSenseTrigger:
+        if lowWaterSensorPin.read_uv() < levelSenseTrigger and highWaterSensorPin.read_uv() < levelSenseTrigger:
             await addWater()
         else:
             pass
