@@ -106,9 +106,9 @@ acRelayThreePin = machine.Pin(21,machine.Pin.OUT,machine.Pin.PULL_DOWN)
 
 #lowWaterSensorPin = machine.ADC(10)
 #lowWaterSensorPin = machine.Pin(5,machine.Pin.IN,machine.Pin.PULL_DOWN) #5
-lowWaterSensorPin = machine.ADC(5)
+lowWaterSensorPin = machine.ADC(3)
 #highWaterSensorPin = machine.Pin(3,machine.Pin.IN) #3
-highWaterSensorPin = machine.ADC(3)
+highWaterSensorPin = machine.ADC(5)
 
 levelSenseTrigger = 5000
 #I2C bus for SCD40 and/or AHT10
@@ -122,9 +122,12 @@ try:
     time.sleep(1)
     oledDisplay.text("Booting up...",0,0,1)
     oledDisplay.show()
+    time.sleep(2)
 except:
     print("no oled")
-    
+
+
+#this should be a class
 feedbackMessage = {
         "ID":"ACSWITCH1",
         "ENABLED": True,
@@ -299,26 +302,39 @@ def displayStatus(messageType,message,*addText):
         print("no oled")
 
 #encapsulate this in a function for easy reconnect
-displayStatus("status","WiFi Connecting")
 station = network.WLAN(network.STA_IF)
-station.active(True)
-time.sleep(1)
 
-connAttempt = 0
-while not station.isconnected():
-    station.connect(config["SSID"], config["WIPASS"])
-    connAttempt +=1
+def wiCon():
+    global station
+    displayStatus("status","WiFi Connecting")
+    #station = network.WLAN(network.STA_IF)
+    station.active(True)
     time.sleep(1)
-    if connAttempt > 10:
-        print("wifi error")
-        displayStatus("error","wifi error")
-        break
 
-time.sleep(1)
-if station.isconnected():
-    print("wifi working")
-    displayStatus("status","WiFi connected",str(station.ifconfig()[0]))
-time.sleep(2)
+    connAttempt = 0
+    while not station.isconnected():
+        station.connect(config["SSID"], config["WIPASS"])
+        connAttempt +=1
+        time.sleep(1)
+        if connAttempt > 10:
+            print("wifi error")
+            displayStatus("error","wifi error")
+            break
+
+    time.sleep(1)
+    if station.isconnected():
+        print("wifi working")
+        displayStatus("status","WiFi connected",str(station.ifconfig()[0]))
+    time.sleep(2)
+
+try:
+    wiCon()
+except:
+    print("wifi error, local mode")
+    displayStatus("status","no net, local mode")
+    #local mode flag
+else:
+    pass
 
 #check for update
 displayStatus("status","Checking for updates")
@@ -424,6 +440,48 @@ def sub_cb(topic, msg):
         statusHandler("webrepl requested","status","launching repl")
         time.sleep(1)
         machine.reset()
+        
+    elif subject == "overwriteSettings":
+        #decodedMsg is ALREADY A JSON, YOU IDIOT! Simplify!
+        #print(decodedMsg)
+        try:
+            with open("configOverwriteBackup.json",'w') as f:
+                json.dump(config, f)
+        except:
+            try:
+                statusHandler("config change","status","could not backup config")
+            except:
+                print("could not backup config")
+        else:
+            try:
+                os.remove("config.json")
+                time.sleep(1)
+            except:
+                print("unable to delete config file")
+            try:
+                #newConfig = decodedMsg["configuration"]
+                print(decodedMsg)
+                print(json.dumps(decodedMsg["configuration"]))
+                '''
+                try:
+                    print(json.dumps(newConfig))
+                except Exception as error:
+                    print(error)
+                '''
+                try:
+                    with open("config.json",'w') as f:
+                        json.dump(decodedMsg["configuration"], f)
+                        time.sleep(1)
+                except Exception as error:
+                    print(error)
+            except Exception as error:
+                print("error updating config")
+                print(error)
+                os.rename("configOverwriteBackup.json","config.json")
+                time.sleep(1)
+            else:
+                print("updated config, rebooting")
+                machine.reset()
         
     elif subject =="FACTORYRESET":
         statusHandler("factory reset request","status","manual reset request recieved")
@@ -578,7 +636,22 @@ else:
 disconMsg = "Client " + str(UID) + " has disconnected unexpectedly at " + str(rtClock.datetime())
 client.set_last_will(config["STATUSTOPIC"],disconMsg)
 
-
+def logHandler(source, level, message):
+    #TODO:add levels
+    logEntry = {
+        "Time": rtc.dateTime(),
+        "Source": source,
+        "Level": level,
+        "Message": message
+        }
+    
+    try:
+        with open('errorLog.txt','a+') as f:
+            f.write("\n")
+            json.dump(logEntry, f)
+    except:
+        print("unable to log local error")
+        
 #log status events:
 def statusHandler(source, statusType, message):
     mem = gc.mem_free()
@@ -686,7 +759,7 @@ async def main():
             fanEnabled = True
         else:
             displayStatus("status",str(atmosphericData["SCD40"]["TEMP"]) + "C " + str(atmosphericData["SCD40"]["HUMIDITY"]) + "% " + str(atmosphericData["SCD40"]["CO2"]) + "ppm")
-            if atmosphericData["SCD40"]["TEMP"] >= 25.0:
+            if atmosphericData["SCD40"]["TEMP"] >= 20.0:
                 fanEnabled = True
             else:
                 fanEnabled = False
@@ -753,8 +826,13 @@ async def main():
         
         #phData["PH"] = phProbeDataPin.read_uv() * 3.3 / 1000000
         phData["PH"] = 7 - (phProbeDataPin.read_uv() * 3.3 / 10000) / 57.14  #need to calibrate and cure fit to be sure of this value
+        #phData["PH"] = 7 - phProbeDataPin.read_uv() / 57.14
         #change this to read ph temp probe
-        phData["TEMP"] = 0
+        #phData["TEMP"] = 0
+        try:
+            phData["TEMP"] = statistics.mean(tempProbeValues)
+        except:
+            phData["TEMP"] = 25.0
         displayStatus("status","pH: " + str(phData["PH"]),"Temp: " + str(phData["TEMP"]))
         
         await asyncio.sleep(1)
@@ -797,7 +875,8 @@ async def main():
         tdsCompensationVoltage = tdsAverageVoltage / tdsCompensationCoefficient
         tdsData["TDS"] = (133.42*tdsCompensationVoltage*tdsCompensationVoltage*tdsCompensationVoltage - 255.86*tdsCompensationVoltage*tdsCompensationVoltage + 857.39*tdsCompensationVoltage)*0.5
         #tdsData["TDS"] = tdsProbeDataPin.read_uv() * 3.3 / 1000000
-        tdsData["EC"] = tdsData["TDS"] * 2 / 1000 * 1000  #calculated value
+        tdsData["EC"] = tdsData["TDS"] * 2 / 1000   #calculated value
+        #TODO: double check the math here
         #time.sleep(1)
         await asyncio.sleep(1)
         displayStatus("status","TDS: " + str(tdsData["TDS"]), "EC: " + str(tdsData["EC"]))
@@ -816,9 +895,9 @@ async def main():
             
         #lowWater = lowWaterSensorPin.value()
         #highWater = highWaterSensorPin.value()
-        lowWater = lowWaterSensorPin.read_uv() *3.3 / 1000000
+        lowWater = lowWaterSensorPin.read_uv() 
         await asyncio.sleep_ms(300)
-        highWater = highWaterSensorPin.read_uv() *3.3 / 1000000
+        highWater = highWaterSensorPin.read_uv()
         
         displayStatus("status","Low Water: " + str(lowWater) + " V","High Water: " + str(highWater) + " V")
         #interrupts for low water sensor, AC control, and dosing
@@ -891,4 +970,5 @@ async def main():
             await asyncio.sleep(1)
             t += 1
         
+        gc.collect()
 asyncio.run(main())  
