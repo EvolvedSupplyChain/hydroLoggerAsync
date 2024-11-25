@@ -135,10 +135,11 @@ feedbackMessage = {
     }
 
 async def addWater(device="ACSWITCH3"):
+    print("add water running")
     for item in config["DEVICES"]:
         if item["ID"] == device:
             devNum = config["DEVICES"].index(item)
-            tempPin = eval(config["DEVICES"][item]["MAPPING"])
+            tempPin = eval(config["DEVICES"][devNum]["MAPPING"])
             feedbackMessage["ID"] = device
             feedbackMessage["ENABLED"] = config["DEVICES"][devNum]["ENABLED"]
             if config["DEVICES"][devNum]["ENABLED"]:
@@ -150,9 +151,10 @@ async def addWater(device="ACSWITCH3"):
                     except:
                         displayStatus("error","unable to send feedback message")
                     while True:
+                        print("add water loop running")
                         if highWaterSensorPin.read_uv() < levelSenseTrigger:
-                            #await asyncio.sleep(1)
-                            time.sleep(1)
+                            await asyncio.sleep(1)
+                            #time.sleep(1)
                             print("adding water")
                             #status handler and display
                         else:
@@ -164,6 +166,7 @@ async def addWater(device="ACSWITCH3"):
                                 displayStatus("error","unable to send feedback message")
                             print("closing valve")
                             #status handler and display
+                            await asyncio.sleep(1)
                             break
                 else:
                     print("water at high level")
@@ -586,8 +589,10 @@ except Exception as error:
 else:
     displayStatus("status","MQTT Good!")
 
-
-client.subscribe(ccTopic)
+try:
+    client.subscribe(ccTopic)
+except:
+    print("local mode, mqtt fail")
 #Helper Functions:
 
     
@@ -958,11 +963,14 @@ async def main():
             fanControlPin.value(1)
         else:
             fanControlPin.value(0)
-            
+        
         if lowWaterSensorPin.read_uv() < levelSenseTrigger and highWaterSensorPin.read_uv() < levelSenseTrigger:
+            print("add water triggered")
             await addWater()
         else:
             pass
+        
+        #await addWater()
         
         t=0
         while t < config["LOGINTERVAL"]:
