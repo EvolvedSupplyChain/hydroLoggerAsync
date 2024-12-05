@@ -31,7 +31,15 @@ except Exception as error:
     print("failed to locate config... looking for backup")
     with open("configDefault.json",'r') as f:
         config = json.load(f)
-        
+
+time.sleep(1)
+
+try:
+    with open("knownNetworks.json",'r') as g:
+        knownNets = json.load(g)
+except:
+    print("no known nets file")
+    
 
 UID = ubinascii.hexlify(machine.unique_id())
 
@@ -133,7 +141,7 @@ feedbackMessage = {
         "ENABLED": True,
         "ON": False
     }
-
+    
 async def addWater(device="ACSWITCH3"):
     print("add water running")
     for item in config["DEVICES"]:
@@ -306,6 +314,9 @@ def displayStatus(messageType,message,*addText):
 
 #encapsulate this in a function for easy reconnect
 station = network.WLAN(network.STA_IF)
+mesh = espnow.ESPNow()
+#no way to scan ESPNow for peers, must pull down list of mac addresses based on provisioning info
+#create local file of known peers to avoid catch 22 of needing remote list
 
 def wiCon():
     global station
@@ -315,19 +326,43 @@ def wiCon():
     time.sleep(1)
 
     connAttempt = 0
-    while not station.isconnected():
-        station.connect(config["SSID"], config["WIPASS"])
-        connAttempt +=1
-        time.sleep(1)
-        if connAttempt > 10:
-            print("wifi error")
-            displayStatus("error","wifi error")
-            break
+    if 'knownNets' in locals() or 'knownNets' in globals():
+        for net in knownNets:
+            for found in network.WLAN().scan():
+                if found[0].decode() == net["SSID"]:
+                    while not station.isconnected():
+                        if connAttempt < 10:
+                            try:
+                                station.connect(net["SSID"],net["PASS"])
+                            except:
+                                connAttempt += 1
+                                time.sleep(1)
+                                continue
+                        else:
+                            break
+                else:
+                    pass
+    else:
+        connAttempt = 0
+        while not station.isconnected():
+            if connAttempt < 10:
+                try:
+                    station.connect(config["SSID"],config["WIPASS"])
+                except:
+                    connAttempt += 1
+                    time.sleep(1)
+                    continue
+            else:
+                break
 
     time.sleep(1)
     if station.isconnected():
         print("wifi working")
         displayStatus("status","WiFi connected",str(station.ifconfig()[0]))
+    else:
+        print("no wifi")
+        displayStatus("status","No Wifi")
+        
     time.sleep(2)
 
 try:
@@ -335,6 +370,7 @@ try:
 except:
     print("wifi error, local mode")
     displayStatus("status","no net, local mode")
+    #look for other units on ESPNOW
     #local mode flag
 else:
     pass
@@ -580,7 +616,8 @@ def sub_cb(topic, msg):
 
 client.set_callback(sub_cb)
 
-
+disconMsg = "Client " + str(UID) + " has disconnected unexpectedly"
+client.set_last_will(statusTopic,disconMsg)
 
 try:
     client.connect()
@@ -588,6 +625,8 @@ except Exception as error:
     displayStatus("error","MQTT error")
 else:
     displayStatus("status","MQTT Good!")
+    #clear the previous last will message
+    client.publish(statusTopic,b'',retain=True)
 
 try:
     client.subscribe(ccTopic)
@@ -638,8 +677,6 @@ if station.isconnected():
 else:
     ntpFail = True
 
-disconMsg = "Client " + str(UID) + " has disconnected unexpectedly at " + str(rtClock.datetime())
-client.set_last_will(config["STATUSTOPIC"],disconMsg)
 
 def logHandler(source, level, message):
     #TODO:add levels
@@ -740,7 +777,7 @@ async def main():
                 if co2Wait < 20:
                     co2Wait += 1
                     #time.sleep_ms(500)
-                    await asyncio.sleep_ms(500)
+                    await asyncio.sleep_ms(200)
                 else:
                     break
         except Exception as error:
@@ -764,7 +801,7 @@ async def main():
             fanEnabled = True
         else:
             displayStatus("status",str(atmosphericData["SCD40"]["TEMP"]) + "C " + str(atmosphericData["SCD40"]["HUMIDITY"]) + "% " + str(atmosphericData["SCD40"]["CO2"]) + "ppm")
-            if atmosphericData["SCD40"]["TEMP"] >= 20.0:
+            if atmosphericData["SCD40"]["TEMP"] >= config["FANCUTOFF"]:
                 fanEnabled = True
             else:
                 fanEnabled = False
@@ -821,7 +858,7 @@ async def main():
         z = 0
         displayStatus("status","warming up pH probe","0")
         
-        while z < 21:
+        while z < 25:
             await listener()
             await asyncio.sleep(1)
             displayStatus("status","warming up pH probe",str(z))
@@ -830,7 +867,17 @@ async def main():
         #time.sleep(15)
         
         #phData["PH"] = phProbeDataPin.read_uv() * 3.3 / 1000000
-        phData["PH"] = 7 - (phProbeDataPin.read_uv() * 3.3 / 10000) / 57.14  #need to calibrate and cure fit to be sure of this value
+        #multisample:
+        t = 0
+        phVals = []
+        while t < 25:
+            phVals.append(7 - (phProbeDataPin.read_uv() * 3.3 / 10000) / 57.14)  #need to calibrate and cure fit to be sure of this value
+            await asyncio.sleep_ms(50)
+            t += 1
+        
+        
+        phData["PH"] = statistics.mean(phVals)
+        
         #phData["PH"] = 7 - phProbeDataPin.read_uv() / 57.14
         #change this to read ph temp probe
         #phData["TEMP"] = 0
@@ -844,6 +891,7 @@ async def main():
         
         print(phData["PH"])
         phProbePowerPin.value(0)
+        #gc.collect()
         await listener()
         await asyncio.sleep(1)
             #make sure TDS probe is switched off
@@ -859,7 +907,7 @@ async def main():
         while y < 21:
             await listener()
             await asyncio.sleep(1)
-            displayStatus("status","warming up pH probe",str(y))
+            displayStatus("status","warming up TDS probe",str(y))
             y += 1
         
         tdsVoltageReadings = []
@@ -901,10 +949,10 @@ async def main():
         #lowWater = lowWaterSensorPin.value()
         #highWater = highWaterSensorPin.value()
         lowWater = lowWaterSensorPin.read_uv() 
-        await asyncio.sleep_ms(300)
+        await asyncio.sleep_ms(100)
         highWater = highWaterSensorPin.read_uv()
         
-        displayStatus("status","Low Water: " + str(lowWater) + " V","High Water: " + str(highWater) + " V")
+        displayStatus("status","Low Water: " + str(lowWater) + " uV","High Water: " + str(highWater) + " uV")
         #interrupts for low water sensor, AC control, and dosing
         
         await listener()
@@ -966,7 +1014,7 @@ async def main():
         
         if lowWaterSensorPin.read_uv() < levelSenseTrigger and highWaterSensorPin.read_uv() < levelSenseTrigger:
             print("add water triggered")
-            await addWater()
+            #await addWater()
         else:
             pass
         
