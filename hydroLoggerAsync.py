@@ -987,6 +987,21 @@ async def main():
         await asyncio.sleep(1)
         await listener()
         
+        if not station.isconnected():
+            reconnectAttempts = 0
+            while not station.isconnected():
+                if reconnectAttempts < 10:
+                    try:
+                        reconnectAttempts += 1
+                        wiCon()
+                        await asyncio.sleep_ms(100)
+                    except:
+                        continue
+                else:
+                    machine.reset()
+        else:
+            pass
+        
         try:
             client.publish(telemTopic, json.dumps(mqttPayload).encode())
         except Exception as error:
