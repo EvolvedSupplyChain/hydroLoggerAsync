@@ -142,7 +142,7 @@ feedbackMessage = {
         "ON": False
     }
     
-async def addWater(device="ACSWITCH3"):
+def addWater(device="ACSWITCH3"):
     print("add water running")
     for item in config["DEVICES"]:
         if item["ID"] == device:
@@ -161,8 +161,9 @@ async def addWater(device="ACSWITCH3"):
                     while True:
                         print("add water loop running")
                         if highWaterSensorPin.read_uv() < levelSenseTrigger:
-                            await asyncio.sleep(1)
-                            #time.sleep(1)
+                            #await asyncio.sleep(1)
+                            
+                            time.sleep(1)
                             print("adding water")
                             #status handler and display
                         else:
@@ -174,7 +175,8 @@ async def addWater(device="ACSWITCH3"):
                                 displayStatus("error","unable to send feedback message")
                             print("closing valve")
                             #status handler and display
-                            await asyncio.sleep(1)
+                            #await asyncio.sleep(1)
+                            time.sleep(1)
                             break
                 else:
                     print("water at high level")
@@ -314,12 +316,12 @@ def displayStatus(messageType,message,*addText):
 
 #encapsulate this in a function for easy reconnect
 station = network.WLAN(network.STA_IF)
-mesh = espnow.ESPNow()
+#mesh = espnow.ESPNow()
 #no way to scan ESPNow for peers, must pull down list of mac addresses based on provisioning info
 #create local file of known peers to avoid catch 22 of needing remote list
 
 def wiCon():
-    global station
+    #global station
     displayStatus("status","WiFi Connecting")
     #station = network.WLAN(network.STA_IF)
     station.active(True)
@@ -621,12 +623,14 @@ client.set_last_will(statusTopic,disconMsg)
 
 try:
     client.connect()
+    time.sleep(1)
 except Exception as error:
     displayStatus("error","MQTT error")
 else:
     displayStatus("status","MQTT Good!")
     #clear the previous last will message
     client.publish(statusTopic,b'',retain=True)
+    time.sleep(1)
 
 try:
     client.subscribe(ccTopic)
@@ -731,6 +735,7 @@ async def hwResponder():
     pass
 
 async def main():
+    #global station
     while True:
         try:
             #client.check_msg()
