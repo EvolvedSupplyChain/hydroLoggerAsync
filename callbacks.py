@@ -1,23 +1,42 @@
 #callbacks
-from hydroLoggerAsync import config
-
+#from hydroLoggerAsync import config
+#from hydroLoggerAsync import client
+'''
 telemTopic = config["TELEMTOPIC"].format(config["TENANT"],UID.decode())
 ccTopic = config["CCTOPIC"].format(config["TENANT"],UID.decode())
 logTopic = config["LOGTOPIC"].format(config["TENANT"],UID.decode())
 statusTopic = config["STATUSTOPIC"].format(config["TENANT"],UID.decode())
 feedbackTopic = config["FEEDBACKTOPIC"].format(config["TENANT"],UID.decode())
 
+class callbackFuncs:
+    def __init__(self,telemTopic,logTopic,statusTopic,feedbackTopic,ccTopic,config,client):
+        self.telemTopic = telemTopic
+        self.logTopic = logTopic
+        self.statusTopic = statusTopic
+        self.feedbackTopic = feedbackTopic
+        self.ccTopic = ccTopic
+        self.config = config
+        self.client = client
+'''
 def sub_cb(topic, msg):
   global config
   global fanEnabled
   global fanOverride
   print((topic, msg))
   if topic.decode() == ccTopic:
+    print("cc message recieved")
     decodedMsg = json.loads(msg.decode())
     subject = decodedMsg.get("subject")
     message = decodedMsg.get("message")
-    displayStatus("status","MQTT Incoming",subject)
+    #displayStatus("status","MQTT Incoming",subject)
+    time.sleep_ms(100)
     #print('Topic: ' + topic + 'Message: ' + msg)
+    print("mesage recieved, publishing feedback")
+    try:
+        
+        client.publish(feedbackTopic, json.dumps({"subject":subject,"message":message}).encode())
+    except Exception as error:
+        print(error)
     if subject == "returnSettings":
         '''
         theSettings = {
