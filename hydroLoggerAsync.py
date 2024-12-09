@@ -1070,7 +1070,7 @@ async def main():
             pass
         
         #await addWater()
-        
+        phProbePowerPin.value(1)
         t=0
         while t < config["LOGINTERVAL"]:
             await listener()
