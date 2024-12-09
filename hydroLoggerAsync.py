@@ -26,6 +26,8 @@ from umqttsimple import MQTTClient
 #from callbacks import *
 #import callbacks
 
+pros3.set_ldo2_power(1)
+
 try:
     with open("config.json",'r') as f:
         config = json.load(f)
