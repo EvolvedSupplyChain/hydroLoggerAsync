@@ -900,7 +900,9 @@ async def main():
         #multisample:
         t = 0
         phVals = []
+        rawPHVals = []
         while t < 15:
+            rawPHVals.append(phProbeDataPin.read_uv())
             phVals.append(7 - (phProbeDataPin.read_uv() * 3.3 / 10000) / 57.14)  #need to calibrate and cure fit to be sure of this value
             await asyncio.sleep_ms(250)
             t += 1
@@ -939,10 +941,12 @@ async def main():
             await asyncio.sleep(1)
             displayStatus("status","warming up TDS probe",str(y))
             y += 1
-        
+            
+        rawTDSVoltageReadings = []
         tdsVoltageReadings = []
         
         for j in range(0,20):
+            rawTDSVoltageReadings.append(tdsProbeDataPin.read_uv())
             tdsVoltageReadings.append(tdsProbeDataPin.read_uv() * 3.3 / 1000000)
             await asyncio.sleep_ms(100)
             j += 1
@@ -997,7 +1001,9 @@ async def main():
                             "ATMOSPHERIC": atmosphericData,
                             "PROBE": probeData,
                             "PH": phData,
+                            "rawPH": rawPHVals,
                             "TDS": tdsData,
+                            "rawTDS": rawTDSVoltageReadings,
                             "RTCLOCK": rtClock.datetime(),
                             "MEMFREE": gc.mem_free(),
                             "MEMUSED": gc.mem_alloc(),
