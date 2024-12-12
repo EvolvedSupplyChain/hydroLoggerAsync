@@ -549,6 +549,8 @@ def sub_cb(topic, msg):
         factoryReset(config["VERSION"])
 
     elif subject == "changeSetting":
+        print("change setting recieved")
+        print(decodedMsg["SETTING"])
         try:
             if decodedMsg["SETTING"] in locals():
                 if isinstance(decodedMsg["VALUE"],type(locals()[decodedMsg["SETTING"]])):
@@ -588,6 +590,20 @@ def sub_cb(topic, msg):
         except Exception as error:
             print("parsing error: ")
             print(error)
+            client.publish(feedbackTopic,error.encode())
+        else:
+            try:
+                with open('config.json','w') as f:
+                    json.dump(config,f)
+            except Exception as error:
+                print(error)
+    elif subject == "backupSettings":
+        try:
+            with open('configBak.json','w') as f:
+                json.dump(config,f)
+        except Exception as error:
+            print(error)
+                
     elif subject == "revertSettings":
         try:
             if "configBak.json" in os.listdir():
